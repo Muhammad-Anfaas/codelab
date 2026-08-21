@@ -1,0 +1,83 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #080b18;
+  color: white;
+}
+
+.coming-soon {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+
+  background:
+    radial-gradient(circle at top, #16498C 0%, transparent 40%),
+    linear-gradient(135deg, #080b18, #111827);
+}
+
+.card {
+  width: 100%;
+  max-width: 1200px;
+  padding: 60px 30px;
+  text-align: center;
+}
+/* #16498C
+
+#0093DD */
+
+.logo {
+  width: 100%;
+  margin: 0 auto 40px;
+  color: #0093DD;
+  font-size: clamp(60px, 10vw, 150px);
+  font-weight: bold;
+  letter-spacing: 5px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+
+.badge {
+  display: inline-block;
+  padding: 8px 15px;
+
+  border: 1px solid #334155;
+  border-radius: 50px;
+
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+
+  font-size: 14px;
+}
+
+p {
+  margin-bottom: 30px;
+  color: #94a3b8;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.button {
+  display: inline-block;
+  padding: 13px 25px;
+
+  border-radius: 10px;
+  background: #16498C;
+
+  color: white;
+  text-decoration: none;
+  font-weight: bold;
+
+  transition: 0.2s;
+}
+
+.button:hover {
+  background: #0093DD;
+  transform: translateY(-2px);
+}

@@ -1,0 +1,48 @@
+.class-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 20px 18px 22px;
+  background: var(--cl-surface);
+  border: 1px solid var(--cl-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+/* Accent stripe on the left edge */
+.class-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--cl-accent);
+}
+.class-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.class-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.class-card-details {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.class-card-meta {
+  font-size: 13.5px;
+  color: var(--cl-muted);
+}
+.class-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 6px;
+}

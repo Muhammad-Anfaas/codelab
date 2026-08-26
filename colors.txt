@@ -1,0 +1,45 @@
+
+#01568f
+
+#00568f
+
+#355c7d
+
+logo
+
+#16498C
+
+#0093DD
+
+
+src/
+├── components/
+│   ├── Sidebar.jsx
+│   ├── Topbar.jsx
+│   ├── Card.jsx
+│   └── Button.jsx
+│
+├── pages/
+│   ├── Login.jsx
+│   │
+│   ├── admin/
+│   │   ├── AdminDashboard.jsx
+│   │   ├── Teachers.jsx
+│   │   ├── Students.jsx
+│   │   └── Classes.jsx
+│   │
+│   ├── teacher/
+│   │   ├── TeacherDashboard.jsx
+│   │   ├── Classes.jsx
+│   │   ├── ClassDetails.jsx
+│   │   └── Students.jsx
+│   │
+│   └── student/
+│       ├── StudentDashboard.jsx
+│       ├── Classes.jsx
+│       ├── Assignments.jsx
+│       └── Grades.jsx
+│
+├── App.jsx
+├── App.css
+└── main.jsx

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DataContext } from './context';
 import { seed } from '../mock/data';
+import { supabase } from '../lib/supabase';
 
 // Temporary id generator. The real ids will come from PostgreSQL.
 const nextId = () => Date.now() + Math.floor(Math.random() * 1000);
@@ -21,17 +22,61 @@ export default function DataProvider({ children }) {
   const [enrollments, setEnrollments] = useState(seed.enrollments);
 
   // POST /api/admin/teachers  (admin only)
-  function addTeacher({ name, email }) {
-    const teacher = {
-      id: nextId(),
-      name,
-      email,
-      mustChangePassword: true, // invited, hasn't logged in yet
-      createdAt: new Date().toISOString(),
-    };
-    setTeachers((prev) => [teacher, ...prev]);
-    return teacher;
+  async function addTeacher({ name, email, employeeId }) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    throw new Error('You must be logged in.');
   }
+
+  const response = await supabase.functions.invoke(
+    'create-teacher',
+    {
+      body: {
+        name,
+        email,
+        employeeId: employeeId || null,
+      },
+    },
+  );
+
+  if (response.error) {
+    throw new Error(response.error.message);
+  }
+
+  const result = response.data;
+
+  if (!result?.success) {
+    throw new Error(
+      result?.error || 'Failed to create teacher.',
+    );
+  }
+
+  const teacher = result.teacher;
+
+  /*
+   * Add the newly-created teacher to the local state
+   * so the table updates immediately.
+   */
+  setTeachers((prev) => [
+    {
+      id: teacher.id,
+      name: teacher.name,
+      email: teacher.email,
+      mustChangePassword: teacher.mustChangePassword,
+      createdAt: teacher.createdAt,
+      employeeId: teacher.employeeId,
+    },
+    ...prev,
+  ]);
+
+  return {
+    ...teacher,
+    temporaryPassword: result.temporaryPassword,
+  };
+}
 
   // DELETE /api/admin/teachers/:id  (admin only)
   // Returns an error message instead of deleting when the teacher still

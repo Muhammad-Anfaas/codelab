@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { findMockAccount } from '../mock/data';
+import { useAuth } from '../auth/AuthProvider';
 import { ROLE_HOME } from '../config/navigation';
 import './Login.css';
 
@@ -9,41 +9,91 @@ function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    setError('');
 
-    // ------------------------------------------------------------------
-    // MOCK LOGIN — frontend only. The password is not checked at all.
-    //
-    // Real version (backend step):
-    //   const res = await fetch('/api/auth/login', { method: 'POST', ... });
-    //   const { user } = await res.json();   // role comes from the SERVER
-    //   navigate(ROLE_HOME[user.role]);
-    //
-    // The role must always come from the server's response, never from
-    // anything typed into this form or stored in the browser.
-    // ------------------------------------------------------------------
-    const account = findMockAccount(email);
-    if (!account) {
-      setError('No account found with that email address.');
+    setError('');
+    setLoading(true);
+
+    const result = await login(email.trim(), password);
+
+    if (!result.success) {
+      setError(result.error);
+      setLoading(false);
       return;
     }
-    navigate(ROLE_HOME[account.role], { replace: true });
+
+    /*
+     * AuthProvider loads the user's profile after authentication.
+     *
+     * For now, get the profile directly so we can determine
+     * where the user should go.
+     */
+
+    const { supabase } = await import('../lib/supabase');
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, is_active, must_change_password')
+      .eq('id', result.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      setError('Your account profile could not be loaded.');
+      setLoading(false);
+      return;
+    }
+
+    if (!profile.is_active) {
+      setError('Your account has been disabled.');
+      setLoading(false);
+      return;
+    }
+
+    if (profile.must_change_password) {
+      /*
+       * We'll build this page later.
+       */
+      navigate('/change-password', { replace: true });
+      setLoading(false);
+      return;
+    }
+
+    const destination = ROLE_HOME[profile.role.toUpperCase()];
+
+    if (!destination) {
+      setError('Your account has an invalid role.');
+      setLoading(false);
+      return;
+    }
+
+    navigate(destination, { replace: true });
+    setLoading(false);
   }
 
   return (
     <div className="login-page">
       <div className="login-box">
         <img src="/logo.svg" alt="Codelab" className="logo" />
+
         <h1>Welcome Back</h1>
-        <p className="subtitle">Login to your account</p>
+
+        <p className="subtitle">
+          Login to your account
+        </p>
 
         <form onSubmit={handleSubmit} noValidate>
+
           <div className="input-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">
+              Email
+            </label>
+
             <input
               type="email"
               id="email"
@@ -56,8 +106,12 @@ function Login() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">
+              Password
+            </label>
+
             <div className="password-wrap">
+
               <input
                 type={showPassword ? 'text' : 'password'}
                 id="password"
@@ -67,14 +121,18 @@ function Login() {
                 onChange={(event) => setPassword(event.target.value)}
                 required
               />
+
               <button
                 type="button"
                 className="peek-btn"
-                onClick={() => setShowPassword((show) => !show)}
+                onClick={() =>
+                  setShowPassword((show) => !show)
+                }
                 aria-pressed={showPassword}
               >
                 {showPassword ? 'Hide' : 'Peek'}
               </button>
+
             </div>
           </div>
 
@@ -84,19 +142,15 @@ function Login() {
             </p>
           )}
 
-          <button type="submit" className="login-btn">
-            Login
+          <button
+            type="submit"
+            className="login-btn"
+            disabled={loading}
+          >
+            {loading ? 'Logging in...' : 'Login'}
           </button>
-        </form>
 
-        {/* import.meta.env.DEV is true for `npm run dev` and false for
-            `npm run build`, so this hint never ships to production. */}
-        {import.meta.env.DEV && (
-          <p className="dev-hint">
-            Dev accounts: admin@codelab.dev · teacher@codelab.dev · student@codelab.dev
-            (any password)
-          </p>
-        )}
+        </form>
       </div>
     </div>
   );

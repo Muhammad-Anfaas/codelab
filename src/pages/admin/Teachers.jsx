@@ -25,14 +25,25 @@ export default function Teachers() {
     classCount: classCountByTeacher(classes, t.id),
   }));
 
-  function handleAdd(values) {
-    const teacher = addTeacher(values);
+ async function handleAdd(values) {
+  try {
+    setNotice(null);
+
+    const teacher = await addTeacher(values);
+
     setShowAdd(false);
+
     setNotice({
       tone: 'info',
-      text: `Invitation sent to ${teacher.email}. (Mock: the backend will generate the temporary password and send the email.)`,
+      text: `Teacher created successfully. Temporary password: ${teacher.temporaryPassword}`,
+    });
+  } catch (error) {
+    setNotice({
+      tone: 'error',
+      text: error.message || 'Failed to create teacher.',
     });
   }
+}
 
   function handleRemove() {
     const error = removeTeacher(pendingRemove.id);

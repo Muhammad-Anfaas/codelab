@@ -1,3 +1,4 @@
+
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import DashboardLayout from './components/DashboardLayout';
@@ -6,6 +7,7 @@ import { AuthProvider } from './auth/AuthProvider';
 import ProtectedRoute from './auth/ProtectedRoute';
 
 import Login from './pages/Login';
+import ChangePassword from './pages/ChangePassword';
 import Placeholder from './pages/Placeholder';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -16,7 +18,7 @@ import Classes from './pages/teacher/Classes';
 import ClassDetails from './pages/teacher/ClassDetails';
 
 import StudentDashboard from './pages/student/StudentDashboard';
-import ChangePassword from './pages/ChangePassword';
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -37,16 +39,42 @@ export default function App() {
               path="/login"
               element={<Login />}
             />
+
+            {/* =========================
+                CHANGE PASSWORD
+               =========================
+
+                This route is accessible only to a
+                logged-in user whose profile says:
+
+                must_change_password = true
+
+                ProtectedRoute handles both cases:
+                - Not logged in → /login
+                - Already changed password → dashboard
+            */}
+
             <Route
-              path="/change-password"
-              element={<ChangePassword />}
-            />
+              element={
+                <ProtectedRoute allowPasswordChange />
+              }
+            >
+              <Route
+                path="/change-password"
+                element={<ChangePassword />}
+              />
+            </Route>
+
 
             {/* =========================
                 ADMIN
                ========================= */}
 
-            <Route element={<ProtectedRoute allowedRole="ADMIN" />}>
+            <Route
+              element={
+                <ProtectedRoute allowedRole="ADMIN" />
+              }
+            >
               <Route
                 path="/admin"
                 element={<DashboardLayout role="ADMIN" />}
@@ -73,7 +101,11 @@ export default function App() {
                 TEACHER
                ========================= */}
 
-            <Route element={<ProtectedRoute allowedRole="TEACHER" />}>
+            <Route
+              element={
+                <ProtectedRoute allowedRole="TEACHER" />
+              }
+            >
               <Route
                 path="/teacher"
                 element={<DashboardLayout role="TEACHER" />}
@@ -105,7 +137,11 @@ export default function App() {
                 STUDENT
                ========================= */}
 
-            <Route element={<ProtectedRoute allowedRole="STUDENT" />}>
+            <Route
+              element={
+                <ProtectedRoute allowedRole="STUDENT" />
+              }
+            >
               <Route
                 path="/student"
                 element={<DashboardLayout role="STUDENT" />}

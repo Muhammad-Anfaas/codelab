@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { ROLE_HOME } from '../config/navigation';
+import { supabase } from '../lib/supabase';
 import './Login.css';
 
 function Login() {
@@ -35,7 +36,7 @@ function Login() {
      * where the user should go.
      */
 
-    const { supabase } = await import('../lib/supabase');
+    // const { supabase } = await import('../lib/supabase');
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')

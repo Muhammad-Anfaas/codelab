@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import './Login.css';
 
 export default function ChangePassword() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
 
   const [password, setPassword] = useState('');
@@ -41,16 +41,25 @@ export default function ChangePassword() {
         throw passwordError;
       }
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          must_change_password: false,
-        })
-        .eq('id', profile.id);
+const { error: profileError } = await supabase
+  .from('profiles')
+  .update({
+    must_change_password: false,
+  })
+  .eq('id', profile.id);
 
-      if (profileError) {
-        throw profileError;
-      }
+if (profileError) {
+  throw profileError;
+}
+await refreshProfile();
+
+if (profile.role === 'admin') {
+  navigate('/admin', { replace: true });
+} else if (profile.role === 'teacher') {
+  navigate('/teacher', { replace: true });
+} else if (profile.role === 'student') {
+  navigate('/student', { replace: true });
+}
 
       navigate('/teacher', { replace: true });
     } catch (err) {

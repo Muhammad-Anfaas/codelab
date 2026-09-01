@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
@@ -11,7 +12,7 @@ export function AuthProvider({ children }) {
   async function loadProfile(authUser) {
     if (!authUser) {
       setProfile(null);
-      return;
+      return null;
     }
 
     const { data, error } = await supabase
@@ -23,10 +24,11 @@ export function AuthProvider({ children }) {
     if (error) {
       console.error('Failed to load profile:', error);
       setProfile(null);
-      return;
+      return null;
     }
 
     setProfile(data);
+    return data;
   }
 
   useEffect(() => {
@@ -42,9 +44,14 @@ export function AuthProvider({ children }) {
       if (session?.user) {
         setUser(session.user);
         await loadProfile(session.user);
+      } else {
+        setUser(null);
+        setProfile(null);
       }
 
-      setLoading(false);
+      if (mounted) {
+        setLoading(false);
+      }
     }
 
     initializeAuth();
@@ -64,7 +71,9 @@ export function AuthProvider({ children }) {
         setProfile(null);
       }
 
-      setLoading(false);
+      if (mounted) {
+        setLoading(false);
+      }
     });
 
     return () => {
@@ -74,7 +83,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function login(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const {
+      data,
+      error,
+    } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -86,10 +98,23 @@ export function AuthProvider({ children }) {
       };
     }
 
+    // Load the profile immediately so Login/ProtectedRoute
+    // can make a decision about the user's role and password state.
+    const loggedInProfile = await loadProfile(data.user);
+
     return {
       success: true,
       user: data.user,
+      profile: loggedInProfile,
+      mustChangePassword:
+        loggedInProfile?.must_change_password === true,
     };
+  }
+
+  async function refreshProfile() {
+    if (!user) return null;
+
+    return await loadProfile(user);
   }
 
   async function logout() {
@@ -104,9 +129,19 @@ export function AuthProvider({ children }) {
     user,
     profile,
     loading,
+
     login,
     logout,
+    refreshProfile,
+
     isAuthenticated: !!user,
+
+    // Convenient boolean for route protection.
+    mustChangePassword:
+      profile?.must_change_password === true,
+
+    // Convenient role value.
+    role: profile?.role ?? null,
   };
 
   return (
@@ -125,3 +160,4 @@ export function useAuth() {
 
   return context;
 }
+

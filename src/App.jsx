@@ -16,7 +16,7 @@ import Classes from './pages/teacher/Classes';
 import ClassDetails from './pages/teacher/ClassDetails';
 
 import StudentDashboard from './pages/student/StudentDashboard';
-
+import ChangePassword from './pages/ChangePassword';
 export default function App() {
   return (
     <BrowserRouter>
@@ -37,7 +37,10 @@ export default function App() {
               path="/login"
               element={<Login />}
             />
-
+            <Route
+              path="/change-password"
+              element={<ChangePassword />}
+            />
 
             {/* =========================
                 ADMIN

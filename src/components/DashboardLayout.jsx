@@ -1,32 +1,33 @@
-
+import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
+
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import { NAVIGATION, ROLE_HOME, ROLE_LABELS } from '../config/navigation';
-// import { useAuth } from '../auth/AuthProvider';
-// import { supabase } from '../lib/supabase';
-// import { useEffect, useState } from 'react';
+
+import {
+  NAVIGATION,
+  ROLE_HOME,
+  ROLE_LABELS,
+} from '../config/navigation';
+
+import { useAuth } from '../auth/AuthProvider';
+
 import './DashboardLayout.css';
 
-/**
- * The shell every dashboard page renders inside: topbar + sidebar + content.
- *
- * The authenticated user/profile comes from AuthProvider.
- * Backend RLS remains responsible for authorization.
- */
 export default function DashboardLayout({ role }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const navigate = useNavigate();
 
-  const { user: authUser, profile, logout } = useAuth();
-const [teacherId, setTeacherId] = useState(null);
+  const {
+    user: authUser,
+    profile,
+    logout,
+  } = useAuth();
+
   const navItems = NAVIGATION[role];
   const roleLabel = ROLE_LABELS[role];
 
-  /*
-   * Convert the Supabase profile into the shape that the
-   * existing dashboard components expect.
-   */
   const user = profile
     ? {
         id: profile.id,
@@ -38,30 +39,12 @@ const [teacherId, setTeacherId] = useState(null);
 
   async function handleLogout() {
     await logout();
-    navigate('/login', { replace: true });
-  }
-  useEffect(() => {
-  async function loadTeacherId() {
-    if (!profile || profile.role !== 'teacher') {
-      return;
-    }
 
-    const { data, error } = await supabase
-      .from('teachers')
-      .select('id')
-      .eq('profile_id', profile.id)
-      .single();
-
-    if (error) {
-      console.error('Failed to load teacher ID:', error);
-      return;
-    }
-
-    setTeacherId(data.id);
+    navigate('/login', {
+      replace: true,
+    });
   }
 
-  loadTeacherId();
-}, [profile]);
   return (
     <div className="dashboard">
       <Topbar
@@ -97,7 +80,6 @@ const [teacherId, setTeacherId] = useState(null);
             authUser,
             profile,
             role,
-            teacherId,
           }}
         />
       </main>

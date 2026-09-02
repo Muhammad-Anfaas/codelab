@@ -12,8 +12,38 @@ function formatAssignment(data) {
     dueAt: data.due_at,
     maxScore: Number(data.max_score),
     status: data.status,
+    durationMinutes: data.duration_minutes,
+    availableFrom: data.available_from,
+    fullscreenRequired: data.fullscreen_required,
+    restrictClipboard: data.restrict_clipboard,
+    maxFocusLosses: data.max_focus_losses,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
+  };
+}
+
+function assignmentRpcValues(assignmentId, values) {
+  return {
+    p_assignment_id: assignmentId,
+    p_class_id: values.classId,
+    p_title: values.title,
+    p_description: values.description,
+    p_due_at: values.dueAt,
+    p_max_score: values.maxScore,
+    p_status: values.status,
+    p_duration_minutes: values.durationMinutes || null,
+    p_available_from: values.availableFrom || null,
+    p_fullscreen_required: values.fullscreenRequired,
+    p_restrict_clipboard: values.restrictClipboard,
+    p_max_focus_losses: values.maxFocusLosses,
+    p_questions: values.questions.map((question, index) => ({
+      position: index + 1,
+      title: question.title,
+      prompt: question.prompt,
+      language: question.language,
+      starter_code: question.starterCode,
+      max_score: question.maxScore,
+    })),
   };
 }
 
@@ -29,6 +59,7 @@ export default function DataProvider({ children }) {
   const [classes, setClasses] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [assignmentQuestions, setAssignmentQuestions] = useState([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
   const [loadingRoster, setLoadingRoster] = useState(true);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
@@ -241,39 +272,52 @@ export default function DataProvider({ children }) {
   const loadAssignments = useCallback(async function loadAssignments() {
     setLoadingAssignments(true);
 
-    const { data, error } = await supabase
-      .from('assignments')
-      .select(`
-        id,
-        class_id,
-        title,
-        description,
-        due_at,
-        max_score,
-        status,
-        created_at,
-        updated_at
-      `)
-      .order('created_at', { ascending: false });
+    const [assignmentsResponse, questionsResponse] = await Promise.all([
+      supabase
+        .from('assignments')
+        .select(`
+          id, class_id, title, description, due_at, max_score, status,
+          duration_minutes, available_from, fullscreen_required,
+          restrict_clipboard, max_focus_losses, created_at, updated_at
+        `)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('assignment_questions')
+        .select(`
+          id, assignment_id, position, title, prompt, language,
+          starter_code, max_score, created_at, updated_at
+        `)
+        .order('position'),
+    ]);
 
-    if (error) {
-      console.error('Failed to load assignments:', error);
+    if (assignmentsResponse.error || questionsResponse.error) {
+      console.error(
+        'Failed to load assignments:',
+        assignmentsResponse.error || questionsResponse.error,
+      );
       setAssignments([]);
+      setAssignmentQuestions([]);
       setLoadingAssignments(false);
       return;
     }
 
-    setAssignments((data || []).map((assignment) => ({
-      id: assignment.id,
-      classId: assignment.class_id,
-      title: assignment.title,
-      description: assignment.description,
-      dueAt: assignment.due_at,
-      maxScore: Number(assignment.max_score),
-      status: assignment.status,
-      createdAt: assignment.created_at,
-      updatedAt: assignment.updated_at,
-    })));
+    setAssignments(
+      (assignmentsResponse.data || []).map(formatAssignment),
+    );
+    setAssignmentQuestions((questionsResponse.data || []).map(
+      (question) => ({
+        id: question.id,
+        assignmentId: question.assignment_id,
+        position: question.position,
+        title: question.title,
+        prompt: question.prompt,
+        language: question.language,
+        starterCode: question.starter_code,
+        maxScore: Number(question.max_score),
+        createdAt: question.created_at,
+        updatedAt: question.updated_at,
+      }),
+    ));
     setLoadingAssignments(false);
   }, []);
 
@@ -289,6 +333,7 @@ export default function DataProvider({ children }) {
         setClasses([]);
         setEnrollments([]);
         setAssignments([]);
+        setAssignmentQuestions([]);
         setCurrentTeacherId(null);
         setLoadingTeachers(false);
         setLoadingRoster(false);
@@ -518,71 +563,40 @@ export default function DataProvider({ children }) {
 
   async function createAssignment(values) {
     const { data, error } = await supabase
-      .from('assignments')
-      .insert({
-        class_id: values.classId,
-        title: values.title,
-        description: values.description,
-        due_at: values.dueAt,
-        max_score: values.maxScore,
-        status: values.status,
-      })
-      .select()
-      .single();
+      .rpc('save_coding_assignment', assignmentRpcValues(null, values));
 
     if (error) throw new Error(error.message);
-
-    const assignment = formatAssignment(data);
-    setAssignments((previous) => [assignment, ...previous]);
-    return assignment;
+    await loadAssignments();
+    return data;
   }
 
   async function updateAssignment(assignmentId, values) {
     const { data, error } = await supabase
-      .from('assignments')
-      .update({
-        class_id: values.classId,
-        title: values.title,
-        description: values.description,
-        due_at: values.dueAt,
-        max_score: values.maxScore,
-        status: values.status,
-      })
-      .eq('id', assignmentId)
-      .select()
-      .single();
+      .rpc(
+        'save_coding_assignment',
+        assignmentRpcValues(assignmentId, values),
+      );
 
     if (error) throw new Error(error.message);
-
-    const assignment = formatAssignment(data);
-    setAssignments((previous) => previous.map((item) => (
-      item.id === assignmentId ? assignment : item
-    )));
-    return assignment;
+    await loadAssignments();
+    return data;
   }
 
   async function updateAssignmentStatus(assignmentId, status) {
-    const { data, error } = await supabase
-      .from('assignments')
-      .update({ status })
-      .eq('id', assignmentId)
-      .select()
-      .single();
+    const { error } = await supabase.rpc(
+      'set_coding_assignment_status',
+      { p_assignment_id: assignmentId, p_status: status },
+    );
 
     if (error) throw new Error(error.message);
-
-    const assignment = formatAssignment(data);
-    setAssignments((previous) => previous.map((item) => (
-      item.id === assignmentId ? assignment : item
-    )));
-    return assignment;
+    await loadAssignments();
   }
 
   async function deleteAssignment(assignmentId) {
-    const { error } = await supabase
-      .from('assignments')
-      .delete()
-      .eq('id', assignmentId);
+    const { error } = await supabase.rpc(
+      'delete_coding_assignment',
+      { p_assignment_id: assignmentId },
+    );
 
     if (error) throw new Error(error.message);
 
@@ -597,6 +611,7 @@ export default function DataProvider({ children }) {
     classes,
     enrollments,
     assignments,
+    assignmentQuestions,
 
     loadingTeachers,
     loadingRoster,

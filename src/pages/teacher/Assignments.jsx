@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import ConfirmDialog from '../../components/ConfirmDialog';
 import DataTable from '../../components/DataTable';
@@ -17,8 +18,10 @@ function statusLabel(status) {
 }
 
 export default function Assignments() {
+  const navigate = useNavigate();
   const {
     assignments,
+    assignmentQuestions,
     classes,
     currentTeacherId,
     loadingAssignments,
@@ -104,7 +107,10 @@ export default function Assignments() {
         <div>
           <div className="assignment-title">{assignment.title}</div>
           <div className="assignment-meta">
-            {assignment.maxScore} points · Created {formatDate(assignment.createdAt)}
+            {assignmentQuestions.filter(
+              (question) => question.assignmentId === assignment.id,
+            ).length} questions · {assignment.maxScore} points · Created{' '}
+            {formatDate(assignment.createdAt)}
           </div>
         </div>
       ),
@@ -143,6 +149,15 @@ export default function Assignments() {
       label: 'Actions',
       render: (assignment) => (
         <div className="assignment-actions">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => navigate(
+              `/teacher/assignments/${assignment.id}/submissions`,
+            )}
+          >
+            Submissions
+          </button>
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -231,6 +246,7 @@ export default function Assignments() {
         <Modal
           title="Create assignment"
           onClose={() => setShowCreate(false)}
+          wide
         >
           <AssignmentForm
             classes={myClasses}
@@ -244,11 +260,15 @@ export default function Assignments() {
         <Modal
           title="Edit assignment"
           onClose={() => setEditing(null)}
+          wide
         >
           <AssignmentForm
             key={editing.id}
             classes={myClasses}
             assignment={editing}
+            questions={assignmentQuestions.filter(
+              (question) => question.assignmentId === editing.id,
+            )}
             onSubmit={handleUpdate}
             onCancel={() => setEditing(null)}
           />

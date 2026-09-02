@@ -1,0 +1,25 @@
+.student-assignment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+}
+
+.student-assignment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid var(--cl-border);
+  border-radius: var(--radius);
+  background: var(--cl-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.student-assignment-card h2 { margin-top: 12px; font-size: 18px; }
+.student-assignment-card p { margin-top: 6px; color: var(--cl-muted); }
+.student-assignment-card dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.student-assignment-card dl div { padding: 10px; border-radius: 8px; background: var(--cl-surface-2); }
+.student-assignment-card dt { color: var(--cl-text-soft); font-size: 11px; text-transform: uppercase; }
+.student-assignment-card dd { margin: 3px 0 0; font-weight: 600; }
+.student-assignment-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
+.student-assignment-footer > span { color: var(--cl-muted); font-size: 13px; }

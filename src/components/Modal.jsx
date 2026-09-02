@@ -8,7 +8,7 @@ import './Modal.css';
  *
  *   {open && <Modal title="Add teacher" onClose={() => setOpen(false)}>…</Modal>}
  */
-export default function Modal({ title, onClose, children }) {
+export default function Modal({ title, onClose, children, wide = false }) {
   const bodyRef = useRef(null);
 
   // On open: focus the first field and stop the page behind from scrolling.
@@ -37,7 +37,12 @@ export default function Modal({ title, onClose, children }) {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div
+        className={`modal${wide ? ' modal-wide' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+      >
         <div className="modal-header">
           <h2 id="modal-title" className="modal-title">{title}</h2>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">

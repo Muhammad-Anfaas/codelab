@@ -1,4 +1,5 @@
 
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import DashboardLayout from './components/DashboardLayout';
@@ -19,6 +20,22 @@ import ClassDetails from './pages/teacher/ClassDetails';
 import Assignments from './pages/teacher/Assignments';
 
 import StudentDashboard from './pages/student/StudentDashboard';
+import StudentAssignments from './pages/student/StudentAssignments';
+
+const AssignmentSubmissions = lazy(
+  () => import('./pages/teacher/AssignmentSubmissions'),
+);
+const CodingWorkspace = lazy(
+  () => import('./pages/student/CodingWorkspace'),
+);
+
+function LazyPage({ children }) {
+  return (
+    <Suspense fallback={<div className="panel"><div className="empty">Loading editor…</div></div>}>
+      {children}
+    </Suspense>
+  );
+}
 
 export default function App() {
   return (
@@ -132,6 +149,11 @@ export default function App() {
                 />
 
                 <Route
+                  path="assignments/:assignmentId/submissions"
+                  element={<LazyPage><AssignmentSubmissions /></LazyPage>}
+                />
+
+                <Route
                   path="*"
                   element={<Placeholder />}
                 />
@@ -155,6 +177,16 @@ export default function App() {
                 <Route
                   index
                   element={<StudentDashboard />}
+                />
+
+                <Route
+                  path="assignments"
+                  element={<StudentAssignments />}
+                />
+
+                <Route
+                  path="assignments/:assignmentId/code"
+                  element={<LazyPage><CodingWorkspace /></LazyPage>}
                 />
 
                 <Route

@@ -1,7 +1,7 @@
 import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import StatCard from '../../components/StatCard';
 import ClassCard from '../../components/ClassCard';
-import { studentAssignments, studentGrades, studentActivity } from '../../mock/data';
+import { studentGrades, studentActivity } from '../../mock/data';
 import { useData } from '../../data/useData';
 import { classesForStudent } from '../../data/selectors';
 import { dueLabel } from '../../utils/format';
@@ -11,11 +11,26 @@ export default function StudentDashboard() {
   const { user } = useOutletContext();
   const navigate = useNavigate();
 
-  const { classes: allClasses, enrollments, teachers } = useData();
+  const {
+    classes: allClasses,
+    enrollments,
+    teachers,
+    students,
+    assignments: availableAssignments,
+  } = useData();
 
-  const classes = classesForStudent(allClasses, enrollments, teachers, user.id);
-  // Assignments and grades are still static — a later step.
-  const assignments = studentAssignments;
+  const currentStudent = students.find((student) => student.profileId === user.id);
+  const classes = classesForStudent(
+    allClasses,
+    enrollments,
+    teachers,
+    currentStudent?.id,
+  );
+  const assignments = availableAssignments.map((assignment) => ({
+    ...assignment,
+    className: classes.find((cls) => cls.id === assignment.classId)?.name || 'Class',
+    status: 'pending',
+  }));
   const grades = studentGrades;
 
   const pending = assignments.filter((a) => a.status === 'pending');

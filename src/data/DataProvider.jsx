@@ -11,6 +11,7 @@ export default function DataProvider({ children }) {
   const [classes, setClasses] = useState(seed.classes);
   const [enrollments, setEnrollments] = useState(seed.enrollments);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
+  const [currentTeacherId, setCurrentTeacherId] = useState(null);
 
   async function loadTeachers() {
     setLoadingTeachers(true);
@@ -55,40 +56,83 @@ export default function DataProvider({ children }) {
     setLoadingTeachers(false);
   }
 
-async function loadClasses() {
-  const { data, error } = await supabase
-    .from('classes')
-    .select(`
-      id,
-      teacher_id,
-      name,
-      section,
-      created_at,
-      updated_at
-    `)
-    .order('created_at', { ascending: false });
+  async function loadClasses() {
+    const { data, error } = await supabase
+      .from('classes')
+      .select(`
+        id,
+        teacher_id,
+        name,
+        section,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Failed to load classes:', error);
-    return;
+    if (error) {
+      console.error('Failed to load classes:', error);
+      return;
+    }
+
+    const formattedClasses = (data || []).map((cls) => ({
+      id: cls.id,
+      teacherId: cls.teacher_id,
+      name: cls.name,
+      section: cls.section,
+      createdAt: cls.created_at,
+      updatedAt: cls.updated_at,
+    }));
+
+    setClasses(formattedClasses);
   }
 
-  const formattedClasses = (data || []).map((cls) => ({
-    id: cls.id,
-    teacherId: cls.teacher_id,
-    name: cls.name,
-    section: cls.section,
-    createdAt: cls.created_at,
-    updatedAt: cls.updated_at,
-  }));
+  useEffect(() => {
+    let cancelled = false;
 
-  setClasses(formattedClasses);
-}
-useEffect(() => {
-  loadTeachers();
-  loadClasses();
-  loadCurrentTeacher();
-}, []);
+    async function initializeData() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (cancelled) return;
+
+      await loadTeachers();
+      await loadClasses();
+
+      if (cancelled) return;
+
+      if (!user) {
+        setCurrentTeacherId(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('id')
+        .eq('profile_id', user.id)
+        .single();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error(
+          'Failed to load current teacher:',
+          error,
+        );
+        setCurrentTeacherId(null);
+        return;
+      }
+
+      setCurrentTeacherId(data.id);
+    }
+
+    initializeData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function addTeacher({ name, email, employeeId }) {
     const {
       data: { session },
@@ -121,7 +165,6 @@ useEffect(() => {
       );
     }
 
-    // Reload from Supabase so the UI always reflects the database.
     await loadTeachers();
 
     return {
@@ -148,38 +191,69 @@ useEffect(() => {
     return null;
   }
 
-async function createClass({ name, section, teacherId }) {
-  const { data, error } = await supabase
-    .from('classes')
-    .insert({
-      teacher_id: teacherId,
-      name: name.trim(),
-      section: section.trim(),
-    })
-    .select()
-    .single();
+  async function createClass({
+    name,
+    section,
+    teacherId,
+  }) {
+    if (!teacherId) {
+      throw new Error(
+        'Your teacher account could not be identified.',
+      );
+    }
 
-  if (error) {
-    console.error('Failed to create class:', error);
-    throw new Error(error.message);
+    const cleanName = name?.trim();
+    const cleanSection = section?.trim();
+
+    if (!cleanName) {
+      throw new Error('Class name is required.');
+    }
+
+    if (!cleanSection) {
+      throw new Error('Section is required.');
+    }
+
+    const { data, error } = await supabase
+      .from('classes')
+      .insert({
+        teacher_id: teacherId,
+        name: cleanName,
+        section: cleanSection,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error(
+        'Failed to create class:',
+        error,
+      );
+
+      throw new Error(error.message);
+    }
+
+    const cls = {
+      id: data.id,
+      teacherId: data.teacher_id,
+      name: data.name,
+      section: data.section,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+
+    setClasses((prev) => [
+      cls,
+      ...prev,
+    ]);
+
+    return cls;
   }
 
-  const cls = {
-    id: data.id,
-    teacherId: data.teacher_id,
-    name: data.name,
-    section: data.section,
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
-
-  setClasses((prev) => [cls, ...prev]);
-
-  return cls;
-}
-
   function addStudentToClass(classId, { name, email }) {
-    let student = students.find((s) => s.email === email);
+    let student = students.find(
+      (s) => s.email === email,
+    );
+
     let created = false;
 
     if (!student) {
@@ -229,26 +303,25 @@ async function createClass({ name, section, teacherId }) {
     );
   }
 
-const value = {
-  teachers,
-  students,
-  classes,
-  enrollments,
+  const value = {
+    teachers,
+    students,
+    classes,
+    enrollments,
 
-  loadingTeachers,
+    loadingTeachers,
 
-  currentTeacherId,
+    currentTeacherId,
 
-  loadTeachers,
-  loadClasses,
-  loadCurrentTeacher,
+    loadTeachers,
+    loadClasses,
 
-  addTeacher,
-  removeTeacher,
-  createClass,
-  addStudentToClass,
-  removeStudentFromClass,
-};
+    addTeacher,
+    removeTeacher,
+    createClass,
+    addStudentToClass,
+    removeStudentFromClass,
+  };
 
   return (
     <DataContext.Provider value={value}>

@@ -10,23 +10,69 @@ import { classesByTeacher, studentCountByClass } from '../../data/selectors';
 
 export default function Classes() {
   const { user } = useOutletContext();
-  const { classes, enrollments, createClass } = useData();
+  const [currentTeacherId, setCurrentTeacherId] = useState(null);
+const {
+  classes,
+  enrollments,
+  createClass,
+  currentTeacherId,
+} = useData();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [showCreate, setShowCreate] = useState(Boolean(location.state?.openCreate));
   const [notice, setNotice] = useState(null);
 
-  const myClasses = classesByTeacher(classes, user.id);
+const myClasses = classesByTeacher(
+  classes,
+  currentTeacherId,
+);
 
-  function handleCreate(values) {
-    // teacherId comes from the logged-in user. In the real app the server
-    // takes it from the session — the client never gets to choose.
-    const cls = createClass({ ...values, teacherId: user.id });
+async function handleCreate(values) {
+  try {
+    const cls = await createClass({
+      ...values,
+      teacherId: currentTeacherId,
+    });
+
     setShowCreate(false);
-    setNotice(cls);
+    setNotice({
+      type: 'success',
+      class: cls,
+    });
+  } catch (error) {
+    setNotice({
+      type: 'error',
+      message:
+        error.message || 'Failed to create class.',
+    });
+  }
+}
+  async function loadCurrentTeacher() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    setCurrentTeacherId(null);
+    return null;
   }
 
+  const { data, error } = await supabase
+    .from('teachers')
+    .select('id')
+    .eq('profile_id', user.id)
+    .single();
+
+  if (error) {
+    console.error('Failed to load current teacher:', error);
+    setCurrentTeacherId(null);
+    return null;
+  }
+
+  setCurrentTeacherId(data.id);
+  return data.id;
+}
   return (
     <>
       <div className="page-header">

@@ -8,6 +8,7 @@ import { useData } from '../../data/useData';
 import { classesByTeacher, studentCountByClass } from '../../data/selectors';
 import { dueLabel } from '../../utils/format';
 import './TeacherDashboard.css';
+const { user, teacherId } = useOutletContext();
 
 const assignmentColumns = [
   { key: 'title', label: 'Assignment' },
@@ -46,7 +47,7 @@ export default function TeacherDashboard() {
 
   const { classes: allClasses, enrollments } = useData();
 
-  const classes = classesByTeacher(allClasses, user.id);
+const classes = classesByTeacher(allClasses, teacherId);
   const assignments = teacherAssignments; // still static — a later step
 
   const totalStudents = classes.reduce((sum, c) => sum + studentCountByClass(enrollments, c.id), 0);

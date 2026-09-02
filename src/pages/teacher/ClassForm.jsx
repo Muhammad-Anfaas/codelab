@@ -39,7 +39,7 @@ export default function ClassForm({ existingClasses = [], onSubmit, onCancel }) 
           className="form-input"
           value={values.name}
           onChange={handleChange}
-          placeholder="e.g. Programming Fundamentals"
+          placeholder="e.g. Programming Fundamentals - Lab"
           aria-invalid={Boolean(errors.name)}
         />
         {errors.name && <span className="form-error">{errors.name}</span>}
@@ -53,7 +53,7 @@ export default function ClassForm({ existingClasses = [], onSubmit, onCancel }) 
           className="form-input"
           value={values.section}
           onChange={handleChange}
-          placeholder="e.g. A"
+          placeholder="e.g. 1-D"
           maxLength={5}
           aria-invalid={Boolean(errors.section)}
         />

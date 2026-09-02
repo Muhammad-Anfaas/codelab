@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { ROLE_HOME } from '../config/navigation';
-import { supabase } from '../lib/supabase';
 import './Login.css';
 
 function Login() {
@@ -21,66 +20,56 @@ function Login() {
     setError('');
     setLoading(true);
 
-    const result = await login(email.trim(), password);
+    try {
+      const result = await login(email.trim(), password);
 
-    if (!result.success) {
-      setError(result.error);
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      const profile = result.profile;
+
+      if (!profile) {
+        setError('Your account profile could not be loaded.');
+        return;
+      }
+
+      if (!profile.is_active) {
+        setError('Your account has been disabled.');
+        return;
+      }
+
+      if (profile.must_change_password) {
+        navigate('/change-password', { replace: true });
+        return;
+      }
+
+      const destination =
+        ROLE_HOME[profile.role.toUpperCase()];
+
+      if (!destination) {
+        setError('Your account has an invalid role.');
+        return;
+      }
+
+      navigate(destination, { replace: true });
+    } catch (error) {
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed.');
+    } finally {
       setLoading(false);
-      return;
     }
-
-    /*
-     * AuthProvider loads the user's profile after authentication.
-     *
-     * For now, get the profile directly so we can determine
-     * where the user should go.
-     */
-
-    // const { supabase } = await import('../lib/supabase');
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role, is_active, must_change_password')
-      .eq('id', result.user.id)
-      .single();
-
-    if (profileError || !profile) {
-      setError('Your account profile could not be loaded.');
-      setLoading(false);
-      return;
-    }
-
-    if (!profile.is_active) {
-      setError('Your account has been disabled.');
-      setLoading(false);
-      return;
-    }
-
-    if (profile.must_change_password) {
-      /*
-       * We'll build this page later.
-       */
-      navigate('/change-password', { replace: true });
-      setLoading(false);
-      return;
-    }
-
-    const destination = ROLE_HOME[profile.role.toUpperCase()];
-
-    if (!destination) {
-      setError('Your account has an invalid role.');
-      setLoading(false);
-      return;
-    }
-
-    navigate(destination, { replace: true });
-    setLoading(false);
   }
 
   return (
     <div className="login-page">
       <div className="login-box">
-        <img src="/logo.svg" alt="Codelab" className="logo" />
+        <img
+          src="/logo.svg"
+          alt="Codelab"
+          className="logo"
+        />
 
         <h1>Welcome Back</h1>
 
@@ -89,7 +78,6 @@ function Login() {
         </p>
 
         <form onSubmit={handleSubmit} noValidate>
-
           <div className="input-group">
             <label htmlFor="email">
               Email
@@ -101,7 +89,9 @@ function Login() {
               placeholder="Enter your email"
               autoComplete="username"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) =>
+                setEmail(event.target.value)
+              }
               required
             />
           </div>
@@ -112,14 +102,19 @@ function Login() {
             </label>
 
             <div className="password-wrap">
-
               <input
-                type={showPassword ? 'text' : 'password'}
+                type={
+                  showPassword
+                    ? 'text'
+                    : 'password'
+                }
                 id="password"
                 placeholder="Enter your password"
                 autoComplete="current-password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) =>
+                  setPassword(event.target.value)
+                }
                 required
               />
 
@@ -127,18 +122,22 @@ function Login() {
                 type="button"
                 className="peek-btn"
                 onClick={() =>
-                  setShowPassword((show) => !show)
+                  setShowPassword(
+                    (show) => !show,
+                  )
                 }
                 aria-pressed={showPassword}
               >
                 {showPassword ? 'Hide' : 'Peek'}
               </button>
-
             </div>
           </div>
 
           {error && (
-            <p className="form-error" role="alert">
+            <p
+              className="form-error"
+              role="alert"
+            >
               {error}
             </p>
           )}
@@ -148,9 +147,10 @@ function Login() {
             className="login-btn"
             disabled={loading}
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading
+              ? 'Logging in...'
+              : 'Login'}
           </button>
-
         </form>
       </div>
     </div>

@@ -45,7 +45,7 @@ export default function InviteForm({ submitLabel = 'Send invitation', onSubmit, 
           className="form-input"
           value={values.name}
           onChange={handleChange}
-          placeholder="e.g. Fatima Noor"
+          placeholder="Behram Shah"
           aria-invalid={Boolean(errors.name)}
         />
         {errors.name && <span className="form-error">{errors.name}</span>}
@@ -60,7 +60,7 @@ export default function InviteForm({ submitLabel = 'Send invitation', onSubmit, 
           className="form-input"
           value={values.email}
           onChange={handleChange}
-          placeholder="name@example.com"
+          placeholder="behram.shah@gmail.com"
           autoComplete="off"
           aria-invalid={Boolean(errors.email)}
         />

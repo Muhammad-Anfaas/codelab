@@ -1,105 +1,183 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DataContext } from './context';
-import { seed } from '../mock/data';
 import { supabase } from '../lib/supabase';
+import { seed } from '../mock/data';
 
-// Temporary id generator. The real ids will come from PostgreSQL.
 const nextId = () => Date.now() + Math.floor(Math.random() * 1000);
 
-/**
- * In-memory "database" for the frontend-only phase.
- *
- * Every action below is named after the API call that will replace it.
- * When the backend exists, the body of each function becomes a fetch(),
- * and the pages that call them don't change.
- *
- * State resets on page reload — that's expected at this stage.
- */
 export default function DataProvider({ children }) {
-  const [teachers, setTeachers] = useState(seed.teachers);
+  const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState(seed.students);
   const [classes, setClasses] = useState(seed.classes);
   const [enrollments, setEnrollments] = useState(seed.enrollments);
+  const [loadingTeachers, setLoadingTeachers] = useState(true);
 
-  // POST /api/admin/teachers  (admin only)
-  async function addTeacher({ name, email, employeeId }) {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  async function loadTeachers() {
+    setLoadingTeachers(true);
 
-  if (!session) {
-    throw new Error('You must be logged in.');
-  }
+    const { data, error } = await supabase
+      .from('teachers')
+      .select(`
+        id,
+        employee_id,
+        created_at,
+        profiles (
+          id,
+          full_name,
+          email,
+          must_change_password,
+          is_active,
+          created_at
+        )
+      `)
+      .order('created_at', { ascending: false });
 
-  const response = await supabase.functions.invoke(
-    'create-teacher',
-    {
-      body: {
-        name,
-        email,
-        employeeId: employeeId || null,
-      },
-    },
-  );
-
-  if (response.error) {
-    throw new Error(response.error.message);
-  }
-
-  const result = response.data;
-
-  if (!result?.success) {
-    throw new Error(
-      result?.error || 'Failed to create teacher.',
-    );
-  }
-
-  const teacher = result.teacher;
-
-  /*
-   * Add the newly-created teacher to the local state
-   * so the table updates immediately.
-   */
-  setTeachers((prev) => [
-    {
-      id: teacher.id,
-      name: teacher.name,
-      email: teacher.email,
-      mustChangePassword: teacher.mustChangePassword,
-      createdAt: teacher.createdAt,
-      employeeId: teacher.employeeId,
-    },
-    ...prev,
-  ]);
-
-  return {
-    ...teacher,
-    temporaryPassword: result.temporaryPassword,
-  };
-}
-
-  // DELETE /api/admin/teachers/:id  (admin only)
-  // Returns an error message instead of deleting when the teacher still
-  // owns classes — the backend will enforce the same rule.
-  function removeTeacher(teacherId) {
-    const owned = classes.filter((c) => c.teacherId === teacherId).length;
-    if (owned > 0) {
-      return `This teacher still has ${owned} class${owned === 1 ? '' : 'es'}. Reassign or delete them first.`;
+    if (error) {
+      console.error('Failed to load teachers:', error);
+      setLoadingTeachers(false);
+      return;
     }
-    setTeachers((prev) => prev.filter((t) => t.id !== teacherId));
+
+    const formattedTeachers = (data || [])
+      .filter((teacher) => teacher.profiles)
+      .map((teacher) => ({
+        id: teacher.id,
+        profileId: teacher.profiles.id,
+        name: teacher.profiles.full_name,
+        email: teacher.profiles.email,
+        mustChangePassword: teacher.profiles.must_change_password,
+        isActive: teacher.profiles.is_active,
+        employeeId: teacher.employee_id,
+        createdAt: teacher.created_at,
+      }));
+
+    setTeachers(formattedTeachers);
+    setLoadingTeachers(false);
+  }
+
+async function loadClasses() {
+  const { data, error } = await supabase
+    .from('classes')
+    .select(`
+      id,
+      teacher_id,
+      name,
+      section,
+      created_at,
+      updated_at
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Failed to load classes:', error);
+    return;
+  }
+
+  const formattedClasses = (data || []).map((cls) => ({
+    id: cls.id,
+    teacherId: cls.teacher_id,
+    name: cls.name,
+    section: cls.section,
+    createdAt: cls.created_at,
+    updatedAt: cls.updated_at,
+  }));
+
+  setClasses(formattedClasses);
+}
+useEffect(() => {
+  loadTeachers();
+  loadClasses();
+  loadCurrentTeacher();
+}, []);
+  async function addTeacher({ name, email, employeeId }) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      throw new Error('You must be logged in.');
+    }
+
+    const response = await supabase.functions.invoke(
+      'create-teacher',
+      {
+        body: {
+          name,
+          email,
+          employeeId: employeeId || null,
+        },
+      },
+    );
+
+    if (response.error) {
+      throw new Error(response.error.message);
+    }
+
+    const result = response.data;
+
+    if (!result?.success) {
+      throw new Error(
+        result?.error || 'Failed to create teacher.',
+      );
+    }
+
+    // Reload from Supabase so the UI always reflects the database.
+    await loadTeachers();
+
+    return {
+      ...result.teacher,
+      temporaryPassword: result.temporaryPassword,
+    };
+  }
+
+  function removeTeacher(teacherId) {
+    const owned = classes.filter(
+      (c) => c.teacherId === teacherId,
+    ).length;
+
+    if (owned > 0) {
+      return `This teacher still has ${owned} class${
+        owned === 1 ? '' : 'es'
+      }. Reassign or delete them first.`;
+    }
+
+    setTeachers((prev) =>
+      prev.filter((t) => t.id !== teacherId),
+    );
+
     return null;
   }
 
-  // POST /api/classes  (teacher only; the server sets teacherId from the session)
-  function createClass({ name, section, teacherId }) {
-    const cls = { id: nextId(), name, section, teacherId, createdAt: new Date().toISOString() };
-    setClasses((prev) => [...prev, cls]);
-    return cls;
+async function createClass({ name, section, teacherId }) {
+  const { data, error } = await supabase
+    .from('classes')
+    .insert({
+      teacher_id: teacherId,
+      name: name.trim(),
+      section: section.trim(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Failed to create class:', error);
+    throw new Error(error.message);
   }
 
-  // POST /api/classes/:id/students  (teacher only, own classes only)
-  // If no student with that email exists yet, one is created and "invited".
-  // Returns { student, created } so the UI can word its message correctly.
+  const cls = {
+    id: data.id,
+    teacherId: data.teacher_id,
+    name: data.name,
+    section: data.section,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+
+  setClasses((prev) => [cls, ...prev]);
+
+  return cls;
+}
+
   function addStudentToClass(classId, { name, email }) {
     let student = students.find((s) => s.email === email);
     let created = false;
@@ -112,35 +190,69 @@ export default function DataProvider({ children }) {
         mustChangePassword: true,
         createdAt: new Date().toISOString(),
       };
+
       created = true;
-      setStudents((prev) => [...prev, student]);
+
+      setStudents((prev) => [
+        ...prev,
+        student,
+      ]);
     }
 
     setEnrollments((prev) => [
       ...prev,
-      { classId, studentId: student.id, joinedAt: new Date().toISOString() },
+      {
+        classId,
+        studentId: student.id,
+        joinedAt: new Date().toISOString(),
+      },
     ]);
-    return { student, created };
+
+    return {
+      student,
+      created,
+    };
   }
 
-  // DELETE /api/classes/:id/students/:studentId
-  function removeStudentFromClass(classId, studentId) {
+  function removeStudentFromClass(
+    classId,
+    studentId,
+  ) {
     setEnrollments((prev) =>
-      prev.filter((e) => !(e.classId === classId && e.studentId === studentId)),
+      prev.filter(
+        (e) =>
+          !(
+            e.classId === classId &&
+            e.studentId === studentId
+          ),
+      ),
     );
   }
 
-  const value = {
-    teachers,
-    students,
-    classes,
-    enrollments,
-    addTeacher,
-    removeTeacher,
-    createClass,
-    addStudentToClass,
-    removeStudentFromClass,
-  };
+const value = {
+  teachers,
+  students,
+  classes,
+  enrollments,
 
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  loadingTeachers,
+
+  currentTeacherId,
+
+  loadTeachers,
+  loadClasses,
+  loadCurrentTeacher,
+
+  addTeacher,
+  removeTeacher,
+  createClass,
+  addStudentToClass,
+  removeStudentFromClass,
+};
+
+  return (
+    <DataContext.Provider value={value}>
+      {children}
+    </DataContext.Provider>
+  );
 }

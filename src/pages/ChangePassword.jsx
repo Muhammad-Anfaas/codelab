@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../auth/AuthProvider';
+import { useAuth } from '../auth/useAuth';
 import './Login.css';
 
 export default function ChangePassword() {
@@ -41,27 +41,28 @@ export default function ChangePassword() {
         throw passwordError;
       }
 
-const { error: profileError } = await supabase
-  .from('profiles')
-  .update({
-    must_change_password: false,
-  })
-  .eq('id', profile.id);
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          must_change_password: false,
+        })
+        .eq('id', profile.id);
 
-if (profileError) {
-  throw profileError;
-}
-await refreshProfile();
+      if (profileError) {
+        throw profileError;
+      }
 
-if (profile.role === 'admin') {
-  navigate('/admin', { replace: true });
-} else if (profile.role === 'teacher') {
-  navigate('/teacher', { replace: true });
-} else if (profile.role === 'student') {
-  navigate('/student', { replace: true });
-}
+      await refreshProfile();
 
-      navigate('/teacher', { replace: true });
+      const roleHome = {
+        admin: '/admin',
+        teacher: '/teacher',
+        student: '/student',
+      };
+
+      navigate(roleHome[profile.role] || '/login', {
+        replace: true,
+      });
     } catch (err) {
       setError(
         err.message || 'Failed to change password.',

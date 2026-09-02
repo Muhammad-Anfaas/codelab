@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import ClassCard from '../../components/ClassCard';
@@ -29,6 +29,21 @@ export default function Classes() {
   );
 
   const [notice, setNotice] = useState(null);
+
+  // The dashboard uses history state to request that this modal opens once.
+  // Consume that flag so refreshing the page does not reopen the modal.
+  useEffect(() => {
+    if (!location.state?.openCreate) return;
+
+    navigate(location.pathname, {
+      replace: true,
+      state: null,
+    });
+  }, [
+    location.pathname,
+    location.state?.openCreate,
+    navigate,
+  ]);
 
   const myClasses = classesByTeacher(
     classes,

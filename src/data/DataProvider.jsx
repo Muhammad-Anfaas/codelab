@@ -1,19 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DataContext } from './context';
 import { supabase } from '../lib/supabase';
-import { seed } from '../mock/data';
-
-const nextId = () => Date.now() + Math.floor(Math.random() * 1000);
+import { useAuth } from '../auth/useAuth';
 
 export default function DataProvider({ children }) {
+  const {
+    user: authUser,
+    profile,
+    loading: authLoading,
+  } = useAuth();
+
   const [teachers, setTeachers] = useState([]);
-  const [students, setStudents] = useState(seed.students);
-  const [classes, setClasses] = useState(seed.classes);
-  const [enrollments, setEnrollments] = useState(seed.enrollments);
+  const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
+  const [loadingRoster, setLoadingRoster] = useState(true);
   const [currentTeacherId, setCurrentTeacherId] = useState(null);
 
-  async function loadTeachers() {
+  const loadTeachers = useCallback(async function loadTeachers() {
     setLoadingTeachers(true);
 
     const { data, error } = await supabase
@@ -54,9 +59,9 @@ export default function DataProvider({ children }) {
 
     setTeachers(formattedTeachers);
     setLoadingTeachers(false);
-  }
+  }, []);
 
-  async function loadClasses() {
+  const loadClasses = useCallback(async function loadClasses() {
     const { data, error } = await supabase
       .from('classes')
       .select(`
@@ -84,24 +89,165 @@ export default function DataProvider({ children }) {
     }));
 
     setClasses(formattedClasses);
-  }
+  }, []);
+
+  const loadRoster = useCallback(async function loadRoster(role) {
+    setLoadingRoster(true);
+
+    if (role === 'teacher') {
+      const { data, error } = await supabase.rpc(
+        'teacher_class_roster',
+      );
+
+      if (error) {
+        console.error(
+          'Failed to load teacher roster:',
+          [error.code, error.message, error.details, error.hint]
+            .filter(Boolean)
+            .join(' — '),
+        );
+        setLoadingRoster(false);
+        return;
+      }
+
+      const studentsById = new Map();
+
+      (data || []).forEach((row) => {
+        if (studentsById.has(row.student_id)) return;
+
+        studentsById.set(row.student_id, {
+          id: row.student_id,
+          rollNumber: row.roll_number,
+          normalizedRollNumber:
+            row.roll_number_normalized,
+          name: row.full_name,
+          email: row.email,
+          mustChangePassword: row.must_change_password,
+          isActive: row.is_active,
+        });
+      });
+
+      setStudents([...studentsById.values()]);
+      setEnrollments(
+        (data || []).map((row) => ({
+          studentId: row.student_id,
+          classId: row.class_id,
+          joinedAt: row.enrolled_at,
+        })),
+      );
+      setLoadingRoster(false);
+      return;
+    }
+
+    const [studentsResponse, enrollmentsResponse] = await Promise.all([
+      supabase
+        .from('students')
+        .select(`
+          id,
+          profile_id,
+          roll_number,
+          roll_number_normalized,
+          created_at,
+          updated_at,
+          profiles (
+            full_name,
+            email,
+            must_change_password,
+            is_active,
+            created_at
+          )
+        `)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('student_classes')
+        .select('student_id, class_id, enrolled_at')
+        .order('enrolled_at', { ascending: false }),
+    ]);
+
+    if (studentsResponse.error) {
+      console.error(
+        'Failed to load students:',
+        studentsResponse.error,
+      );
+    }
+
+    if (enrollmentsResponse.error) {
+      console.error(
+        'Failed to load enrollments:',
+        enrollmentsResponse.error,
+      );
+    }
+
+    if (!studentsResponse.error) {
+      const formattedStudents = (studentsResponse.data || [])
+        .map((student) => {
+          const studentProfile = Array.isArray(student.profiles)
+            ? student.profiles[0]
+            : student.profiles;
+
+          if (!studentProfile) return null;
+
+          return {
+            id: student.id,
+            profileId: student.profile_id,
+            rollNumber: student.roll_number,
+            normalizedRollNumber:
+              student.roll_number_normalized,
+            name: studentProfile.full_name,
+            email: studentProfile.email,
+            mustChangePassword:
+              studentProfile.must_change_password,
+            isActive: studentProfile.is_active,
+            createdAt: student.created_at,
+            updatedAt: student.updated_at,
+          };
+        })
+        .filter(Boolean);
+
+      setStudents(formattedStudents);
+    }
+
+    if (!enrollmentsResponse.error) {
+      const formattedEnrollments = (
+        enrollmentsResponse.data || []
+      ).map((enrollment) => ({
+        studentId: enrollment.student_id,
+        classId: enrollment.class_id,
+        joinedAt: enrollment.enrolled_at,
+      }));
+
+      setEnrollments(formattedEnrollments);
+    }
+
+    setLoadingRoster(false);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function initializeData() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      if (authLoading) return;
+
+      if (!authUser || !profile) {
+        setTeachers([]);
+        setStudents([]);
+        setClasses([]);
+        setEnrollments([]);
+        setCurrentTeacherId(null);
+        setLoadingTeachers(false);
+        setLoadingRoster(false);
+        return;
+      }
+
+      await Promise.all([
+        loadTeachers(),
+        loadClasses(),
+        loadRoster(profile.role),
+      ]);
 
       if (cancelled) return;
 
-      await loadTeachers();
-      await loadClasses();
-
-      if (cancelled) return;
-
-      if (!user) {
+      if (profile.role !== 'teacher') {
         setCurrentTeacherId(null);
         return;
       }
@@ -109,7 +255,7 @@ export default function DataProvider({ children }) {
       const { data, error } = await supabase
         .from('teachers')
         .select('id')
-        .eq('profile_id', user.id)
+        .eq('profile_id', authUser.id)
         .single();
 
       if (cancelled) return;
@@ -131,7 +277,14 @@ export default function DataProvider({ children }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [
+    authLoading,
+    authUser,
+    profile,
+    loadClasses,
+    loadRoster,
+    loadTeachers,
+  ]);
 
   async function addTeacher({ name, email, employeeId }) {
     const {
@@ -249,49 +402,50 @@ export default function DataProvider({ children }) {
     return cls;
   }
 
-  function addStudentToClass(classId, { name, email }) {
-    let student = students.find(
-      (s) => s.email === email,
+  async function importStudents(
+    classId,
+    { fileName, students: studentRows },
+  ) {
+    const response = await supabase.functions.invoke(
+      'import-students',
+      {
+        body: {
+          classId,
+          fileName,
+          students: studentRows,
+        },
+      },
     );
 
-    let created = false;
-
-    if (!student) {
-      student = {
-        id: nextId(),
-        name,
-        email,
-        mustChangePassword: true,
-        createdAt: new Date().toISOString(),
-      };
-
-      created = true;
-
-      setStudents((prev) => [
-        ...prev,
-        student,
-      ]);
+    if (response.error) {
+      throw new Error(response.error.message);
     }
 
-    setEnrollments((prev) => [
-      ...prev,
-      {
-        classId,
-        studentId: student.id,
-        joinedAt: new Date().toISOString(),
-      },
-    ]);
+    if (!response.data?.success) {
+      throw new Error(
+        response.data?.error || 'Student import failed.',
+      );
+    }
 
-    return {
-      student,
-      created,
-    };
+    await loadRoster(profile?.role);
+
+    return response.data;
   }
 
-  function removeStudentFromClass(
+  async function removeStudentFromClass(
     classId,
     studentId,
   ) {
+    const { error } = await supabase
+      .from('student_classes')
+      .delete()
+      .eq('class_id', classId)
+      .eq('student_id', studentId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
     setEnrollments((prev) =>
       prev.filter(
         (e) =>
@@ -310,16 +464,18 @@ export default function DataProvider({ children }) {
     enrollments,
 
     loadingTeachers,
+    loadingRoster,
 
     currentTeacherId,
 
     loadTeachers,
     loadClasses,
+    loadRoster,
 
     addTeacher,
     removeTeacher,
     createClass,
-    addStudentToClass,
+    importStudents,
     removeStudentFromClass,
   };
 

@@ -10,7 +10,7 @@ import {
   ROLE_LABELS,
 } from '../config/navigation';
 
-import { useAuth } from '../auth/AuthProvider';
+import { useAuth } from '../auth/useAuth';
 
 import './DashboardLayout.css';
 

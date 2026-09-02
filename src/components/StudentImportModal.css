@@ -1,0 +1,31 @@
+.import-summary {
+  font-size: 13.5px;
+  color: var(--cl-muted);
+}
+
+.import-errors {
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-left: 4px solid var(--cl-danger);
+  border-radius: 8px;
+  background: var(--cl-danger-tint);
+  color: var(--cl-danger);
+  font-size: 13px;
+}
+
+.import-errors ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.import-preview {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--cl-border);
+  border-radius: 8px;
+}
+
+.import-preview .table {
+  min-width: 620px;
+}

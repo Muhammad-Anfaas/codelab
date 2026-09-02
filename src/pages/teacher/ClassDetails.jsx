@@ -1,29 +1,38 @@
 import { useState } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import DataTable from '../../components/DataTable';
-import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import InviteForm from '../../components/InviteForm';
 import Notice from '../../components/Notice';
 import Icon from '../../components/Icon';
+import StudentImportModal from '../../components/StudentImportModal';
 import { useData } from '../../data/useData';
 import { studentsInClass } from '../../data/selectors';
 import { formatDate } from '../../utils/format';
 import './ClassDetails.css';
 
 export default function ClassDetails() {
-  const { user } = useOutletContext();
   const { classId } = useParams();
-  const { classes, students, enrollments, addStudentToClass, removeStudentFromClass } = useData();
+  const {
+    classes,
+    students,
+    enrollments,
+    currentTeacherId,
+    loadingRoster,
+    importStudents,
+    removeStudentFromClass,
+  } = useData();
 
-  const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [pendingRemove, setPendingRemove] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  // URL params are strings; ids in the store are numbers.
-  const id = Number(classId);
-  // Only this teacher's classes. (UI convenience — the backend will enforce it.)
-  const cls = classes.find((c) => c.id === id && c.teacherId === user.id);
+  // Class IDs are Supabase UUID strings. RLS remains the security boundary;
+  // this ownership check keeps the UI from exposing another teacher's class.
+  const cls = classes.find(
+    (candidate) =>
+      candidate.id === classId &&
+      candidate.teacherId === currentTeacherId,
+  );
 
   if (!cls) {
     return (
@@ -44,23 +53,50 @@ export default function ClassDetails() {
 
   const roster = studentsInClass(students, enrollments, cls.id);
 
-  function handleAdd(values) {
-    const { student, created } = addStudentToClass(cls.id, values);
-    setShowAdd(false);
-    setNotice(
-      created
-        ? `Invitation sent to ${student.email}. (Mock: the backend will generate the temporary password and send the email.)`
-        : `${student.name} already had a Codelab account and was added to this class.`,
-    );
+  async function handleImport(values) {
+    const result = await importStudents(cls.id, values);
+    const summary = result.summary;
+
+    setShowImport(false);
+    setNotice({
+      tone: summary.failed > 0 ? 'error' : 'info',
+      text:
+        `Import complete: ${summary.created} account${summary.created === 1 ? '' : 's'} created, ` +
+        `${summary.enrolled} enrollment${summary.enrolled === 1 ? '' : 's'} added, ` +
+        `${summary.alreadyEnrolled} already enrolled, ` +
+        `${summary.failed} failed.`,
+    });
   }
 
-  function handleRemove() {
-    removeStudentFromClass(cls.id, pendingRemove.id);
-    setNotice(`${pendingRemove.name} was removed from ${cls.name}.`);
-    setPendingRemove(null);
+  async function handleRemove() {
+    try {
+      await removeStudentFromClass(
+        cls.id,
+        pendingRemove.id,
+      );
+      setNotice({
+        tone: 'info',
+        text: `${pendingRemove.name} was removed from ${cls.name}.`,
+      });
+      setPendingRemove(null);
+    } catch (error) {
+      setNotice({
+        tone: 'error',
+        text:
+          error.message ||
+          'The student could not be removed from this class.',
+      });
+    }
   }
 
   const columns = [
+    {
+      key: 'rollNumber',
+      label: 'Roll number',
+      render: (student) => (
+        <span className="mono nowrap">{student.rollNumber}</span>
+      ),
+    },
     { key: 'name', label: 'Name', render: (s) => <span className="nowrap">{s.name}</span> },
     { key: 'email', label: 'Email' },
     { key: 'joinedAt', label: 'Joined', render: (s) => <span className="mono nowrap">{formatDate(s.joinedAt)}</span> },
@@ -101,36 +137,44 @@ export default function ClassDetails() {
             {roster.length} student{roster.length === 1 ? '' : 's'}
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => setShowAdd(true)}>
+        <button type="button" className="btn btn-primary" onClick={() => setShowImport(true)}>
           <Icon name="plus" size={16} />
-          Add student
+          Import CSV
         </button>
       </div>
 
-      {notice && <Notice onDismiss={() => setNotice(null)}>{notice}</Notice>}
+      {notice && (
+        <Notice
+          tone={notice.tone}
+          onDismiss={() => setNotice(null)}
+        >
+          {notice.text}
+        </Notice>
+      )}
 
       <section className="section">
         <div className="section-header">
           <h2 className="section-title">Students</h2>
         </div>
         <div className="panel">
-          <DataTable columns={columns} rows={roster} emptyMessage="No students yet. Add the first one." />
+          <DataTable
+            columns={columns}
+            rows={roster}
+            emptyMessage={
+              loadingRoster
+                ? 'Loading students…'
+                : 'No students yet. Import a CSV to add the first roster.'
+            }
+          />
         </div>
       </section>
 
-      {showAdd && (
-        <Modal title="Add student" onClose={() => setShowAdd(false)}>
-          <InviteForm
-            submitLabel="Add student"
-            onSubmit={handleAdd}
-            onCancel={() => setShowAdd(false)}
-            validate={(v) =>
-              roster.some((s) => s.email === v.email)
-                ? { email: 'This student is already in the class.' }
-                : null
-            }
-          />
-        </Modal>
+      {showImport && (
+        <StudentImportModal
+          classSection={cls.section}
+          onImport={handleImport}
+          onCancel={() => setShowImport(false)}
+        />
       )}
 
       {pendingRemove && (

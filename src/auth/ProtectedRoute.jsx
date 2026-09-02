@@ -1,6 +1,6 @@
 
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from './AuthProvider';
+import { useAuth } from './useAuth';
 
 export default function ProtectedRoute({
   allowedRole,
@@ -104,4 +104,3 @@ export default function ProtectedRoute({
 
   return <Outlet />;
 }
-

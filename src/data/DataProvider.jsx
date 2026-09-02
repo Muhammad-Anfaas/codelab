@@ -3,6 +3,20 @@ import { DataContext } from './context';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/useAuth';
 
+function formatAssignment(data) {
+  return {
+    id: data.id,
+    classId: data.class_id,
+    title: data.title,
+    description: data.description,
+    dueAt: data.due_at,
+    maxScore: Number(data.max_score),
+    status: data.status,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+}
+
 export default function DataProvider({ children }) {
   const {
     user: authUser,
@@ -14,8 +28,10 @@ export default function DataProvider({ children }) {
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [loadingTeachers, setLoadingTeachers] = useState(true);
   const [loadingRoster, setLoadingRoster] = useState(true);
+  const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [currentTeacherId, setCurrentTeacherId] = useState(null);
 
   const loadTeachers = useCallback(async function loadTeachers() {
@@ -222,6 +238,45 @@ export default function DataProvider({ children }) {
     setLoadingRoster(false);
   }, []);
 
+  const loadAssignments = useCallback(async function loadAssignments() {
+    setLoadingAssignments(true);
+
+    const { data, error } = await supabase
+      .from('assignments')
+      .select(`
+        id,
+        class_id,
+        title,
+        description,
+        due_at,
+        max_score,
+        status,
+        created_at,
+        updated_at
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Failed to load assignments:', error);
+      setAssignments([]);
+      setLoadingAssignments(false);
+      return;
+    }
+
+    setAssignments((data || []).map((assignment) => ({
+      id: assignment.id,
+      classId: assignment.class_id,
+      title: assignment.title,
+      description: assignment.description,
+      dueAt: assignment.due_at,
+      maxScore: Number(assignment.max_score),
+      status: assignment.status,
+      createdAt: assignment.created_at,
+      updatedAt: assignment.updated_at,
+    })));
+    setLoadingAssignments(false);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -233,9 +288,11 @@ export default function DataProvider({ children }) {
         setStudents([]);
         setClasses([]);
         setEnrollments([]);
+        setAssignments([]);
         setCurrentTeacherId(null);
         setLoadingTeachers(false);
         setLoadingRoster(false);
+        setLoadingAssignments(false);
         return;
       }
 
@@ -243,6 +300,7 @@ export default function DataProvider({ children }) {
         loadTeachers(),
         loadClasses(),
         loadRoster(profile.role),
+        loadAssignments(),
       ]);
 
       if (cancelled) return;
@@ -284,6 +342,7 @@ export default function DataProvider({ children }) {
     loadClasses,
     loadRoster,
     loadTeachers,
+    loadAssignments,
   ]);
 
   async function addTeacher({ name, email, employeeId }) {
@@ -457,26 +516,108 @@ export default function DataProvider({ children }) {
     );
   }
 
+  async function createAssignment(values) {
+    const { data, error } = await supabase
+      .from('assignments')
+      .insert({
+        class_id: values.classId,
+        title: values.title,
+        description: values.description,
+        due_at: values.dueAt,
+        max_score: values.maxScore,
+        status: values.status,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    const assignment = formatAssignment(data);
+    setAssignments((previous) => [assignment, ...previous]);
+    return assignment;
+  }
+
+  async function updateAssignment(assignmentId, values) {
+    const { data, error } = await supabase
+      .from('assignments')
+      .update({
+        class_id: values.classId,
+        title: values.title,
+        description: values.description,
+        due_at: values.dueAt,
+        max_score: values.maxScore,
+        status: values.status,
+      })
+      .eq('id', assignmentId)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    const assignment = formatAssignment(data);
+    setAssignments((previous) => previous.map((item) => (
+      item.id === assignmentId ? assignment : item
+    )));
+    return assignment;
+  }
+
+  async function updateAssignmentStatus(assignmentId, status) {
+    const { data, error } = await supabase
+      .from('assignments')
+      .update({ status })
+      .eq('id', assignmentId)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    const assignment = formatAssignment(data);
+    setAssignments((previous) => previous.map((item) => (
+      item.id === assignmentId ? assignment : item
+    )));
+    return assignment;
+  }
+
+  async function deleteAssignment(assignmentId) {
+    const { error } = await supabase
+      .from('assignments')
+      .delete()
+      .eq('id', assignmentId);
+
+    if (error) throw new Error(error.message);
+
+    setAssignments((previous) => previous.filter(
+      (assignment) => assignment.id !== assignmentId,
+    ));
+  }
+
   const value = {
     teachers,
     students,
     classes,
     enrollments,
+    assignments,
 
     loadingTeachers,
     loadingRoster,
+    loadingAssignments,
 
     currentTeacherId,
 
     loadTeachers,
     loadClasses,
     loadRoster,
+    loadAssignments,
 
     addTeacher,
     removeTeacher,
     createClass,
     importStudents,
     removeStudentFromClass,
+    createAssignment,
+    updateAssignment,
+    updateAssignmentStatus,
+    deleteAssignment,
   };
 
   return (

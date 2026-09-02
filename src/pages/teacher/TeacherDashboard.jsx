@@ -5,7 +5,6 @@ import ClassCard from '../../components/ClassCard';
 import DataTable from '../../components/DataTable';
 import Icon from '../../components/Icon';
 
-import { teacherAssignments } from '../../mock/data';
 import { useData } from '../../data/useData';
 import {
   classesByTeacher,
@@ -30,14 +29,16 @@ const assignmentColumns = [
     render: (assignment) => (
       <span
         className={`badge ${
-          assignment.status === 'active'
+          assignment.status === 'published'
             ? 'badge-accent'
             : 'badge-muted'
         }`}
       >
-        {assignment.status === 'active'
+        {assignment.status === 'published'
           ? dueLabel(assignment.dueAt)
-          : 'Closed'}
+          : assignment.status === 'closed'
+            ? 'Closed'
+            : 'Draft'}
       </span>
     ),
   },
@@ -55,7 +56,9 @@ const assignmentColumns = [
             className="progress-bar"
             style={{
               width: `${Math.round(
-                (assignment.submitted / assignment.total) * 100,
+                assignment.total === 0
+                  ? 0
+                  : (assignment.submitted / assignment.total) * 100,
               )}%`,
             }}
           />
@@ -72,6 +75,7 @@ export default function TeacherDashboard() {
   const {
     classes: allClasses,
     enrollments,
+    assignments: allAssignments,
     currentTeacherId,
   } = useData();
 
@@ -80,7 +84,20 @@ export default function TeacherDashboard() {
     currentTeacherId,
   );
 
-  const assignments = teacherAssignments;
+  const classIds = new Set(classes.map((cls) => cls.id));
+  const assignments = allAssignments
+    .filter((assignment) => classIds.has(assignment.classId))
+    .map((assignment) => ({
+      ...assignment,
+      className: classes.find(
+        (cls) => cls.id === assignment.classId,
+      )?.name || 'Unknown class',
+      submitted: 0,
+      total: studentCountByClass(
+        enrollments,
+        assignment.classId,
+      ),
+    }));
 
   const totalStudents = classes.reduce(
     (sum, c) =>
@@ -89,7 +106,7 @@ export default function TeacherDashboard() {
   );
 
   const activeAssignments = assignments.filter(
-    (a) => a.status === 'active',
+    (a) => a.status === 'published',
   );
 
   return (

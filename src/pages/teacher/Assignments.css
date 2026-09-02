@@ -1,0 +1,28 @@
+.assignment-title {
+  font-weight: 600;
+  color: var(--cl-text);
+}
+
+.assignment-meta {
+  margin-top: 2px;
+  color: var(--cl-text-soft);
+  font-size: 12.5px;
+}
+
+.assignment-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.assignment-description {
+  min-height: 120px;
+  resize: vertical;
+}
+
+@media (max-width: 720px) {
+  .assignment-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

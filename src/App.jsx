@@ -16,6 +16,7 @@ import Teachers from './pages/admin/Teachers';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import Classes from './pages/teacher/Classes';
 import ClassDetails from './pages/teacher/ClassDetails';
+import Assignments from './pages/teacher/Assignments';
 
 import StudentDashboard from './pages/student/StudentDashboard';
 
@@ -123,6 +124,11 @@ export default function App() {
                 <Route
                   path="classes/:classId"
                   element={<ClassDetails />}
+                />
+
+                <Route
+                  path="assignments"
+                  element={<Assignments />}
                 />
 
                 <Route

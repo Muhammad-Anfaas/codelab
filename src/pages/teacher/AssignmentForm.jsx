@@ -49,7 +49,7 @@ export default function AssignmentForm({
     maxFocusLosses: assignment?.maxFocusLosses ?? 5,
     questions: questions.length > 0
       ? questions.map((question) => ({ ...question }))
-      : Array.from({ length: 6 }, (_, index) => blankQuestion(index + 1)),
+      : [blankQuestion(1)],
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -125,9 +125,9 @@ export default function AssignmentForm({
     }
     if (
       ['published', 'closed'].includes(values.status)
-      && (values.questions.length < 6 || values.questions.length > 7)
+      && values.questions.length === 0
     ) {
-      nextErrors.questions = 'Published assignments require 6 or 7 questions.';
+      nextErrors.questions = 'Published assignments require at least one question.';
     }
 
     values.questions.forEach((question, index) => {
@@ -254,10 +254,10 @@ export default function AssignmentForm({
       <div className="question-builder-header">
         <div>
           <h3>Coding questions</h3>
-          <p>Published assessments must contain 6 or 7 questions.</p>
+          <p>Add as many questions as this assessment needs.</p>
         </div>
         <button type="button" className="btn btn-outline btn-sm"
-          onClick={addQuestion} disabled={submitting || values.questions.length >= 7}>
+          onClick={addQuestion} disabled={submitting || values.questions.length >= 50}>
           Add question
         </button>
       </div>

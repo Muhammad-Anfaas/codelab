@@ -183,7 +183,7 @@ Deno.serve(async (request) => {
       .select('id, position, title, prompt, language, starter_code, max_score')
       .eq('assignment_id', assignment.id)
       .order('position');
-    if (questionsError || !questions || questions.length < 6 || questions.length > 7) {
+    if (questionsError || !questions || questions.length === 0) {
       return jsonResponse({ error: 'Assignment setup is incomplete.' }, 409);
     }
 

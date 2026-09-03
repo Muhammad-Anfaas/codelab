@@ -34,7 +34,7 @@ export default function StudentAssignments() {
         {rows.length === 0 ? (
           <div className="panel"><div className="empty">No assignments are available.</div></div>
         ) : rows.map((assignment) => {
-          const ready = assignment.questionCount >= 6;
+          const ready = assignment.questionCount > 0;
           return (
             <article className="student-assignment-card" key={assignment.id}>
               <div>
